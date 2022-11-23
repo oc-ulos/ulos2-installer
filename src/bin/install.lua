@@ -22,7 +22,10 @@ local function promptYN(thing, yes, no)
   repeat
     io.write(p)
     input = io.read("l")
-  until (yes or no) or input:match("[ynYN]")
+  until (yes or no) or input:match("^[ynYN]$")
+
+  if input == "" and yes then input = "y" end
+
   return input == "Y" or input == "y"
 end
 
@@ -94,7 +97,7 @@ while true do
     return filesystems[tonumber(x) or 0]
   end))
 
-  print("All data on the selected device will be erased.")
+  print("\n\27[97mAll data on the selected device will be erased.")
   print("\27[91mProceed with caution.\27[39m")
   if promptYN(string.format("Continue with %s?", filesystems[num]:sub(1,8)),
       true, false) then
@@ -150,9 +153,10 @@ end
 
 print("The base system is now installed.")
 
-print("Now we will perform some basic setup.")
+print("\nNow we will perform some basic setup.")
 
 local pwd = require("posix.pwd")
+local grp = require("posix.grp")
 local unistd = require("posix.unistd")
 
 local okc, errc = sys.chroot("/install")
@@ -182,7 +186,7 @@ print("First, choose a new root password.")
 
 changePassword("root", "Enter a new root password")
 
-print("Now you need to set up a user account.")
+print("\nNow you need to set up a user account.")
 
 do
   local name = promptText("Enter a name for the new account", nil, false,
@@ -190,7 +194,22 @@ do
       return n:match("[a-z_][a-z0-9_%-]*%$?") and #n <= 32
     end)
 
-  print(os.execute("useradd -m " .. name))
+  -- TODO: figure out why `os.execute("useradd ...") wasn't working here
+  pwd.update_passwd {
+    pw_name = name,
+    pw_passwd = "",
+    pw_uid = 1,
+    pw_gid = 1,
+    pw_gecos = "",
+    pw_dir = "/home/"..name,
+    pw_shell = "/bin/sh.lua"
+  }
+
+  grp.update_group {
+    gr_name = name,
+    gr_gid = 1,
+    gr_mem = {name}
+  }
 
   changePassword(name, "Enter a password for the new account")
 end
@@ -198,6 +217,12 @@ end
 local okc2, errc2 = sys.chroot("/")
 if not okc2 then
   fail("exit chroot failed: %s", errno.errno(errc2))
+end
+
+print("Unmounting install filesystem")
+local oku, erru = sys.unmount("/install")
+if not oku then
+  fail("unmount /install failed: %s", errno.errno(erru))
 end
 
 print("The system should now be set up and functional.")
