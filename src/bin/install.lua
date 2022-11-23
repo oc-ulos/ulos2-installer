@@ -2,9 +2,13 @@
 -- at long last, a ULOS 2 installer --
 
 print([[
-Welcome to the ULOS 2 installer.  This program will guide you through installing ULOS 2 on your computer.
+Welcome to the ULOS 2 installer.  This program will guide you through installing
+ULOS 2 on your computer.
 
-ULOS 2 is a fast, feature-filled Unix-like operating system aiming for general compatibility with standard LuaPosix programs.  It features robust pre-emptive multitasking, support for arbitrary executable formats and filesystems, and even basic shell scripting.
+ULOS 2 is a fast, feature-filled Unix-like operating system aiming for general
+compatibility with standard LuaPosix programs.  It features robust pre-emptive
+multitasking, support for arbitrary executable formats and filesystems, and even
+basic shell scripting.
 ]])
 
 local function printf(...)
@@ -50,7 +54,7 @@ local function promptText(thing, default, canBeEmpty, verify, hide)
 
     if hide then sys.ioctl(0, "stty", {echo = false}) end
     input = io.read("*l")
-    if hide then sys.ioctl(0, "stty", {echo = true}) end
+    if hide then sys.ioctl(0, "stty", {echo = true}); io.write("\n") end
   until (verify and verify(input)) or canBeEmpty or #input > 0
 
   return input
@@ -186,7 +190,7 @@ do
       return n:match("[a-z_][a-z0-9_%-]*%$?") and #n <= 32
     end)
 
-  os.execute("useradd -m " .. name)
+  print(os.execute("useradd -m " .. name))
 
   changePassword(name, "Enter a password for the new account")
 end
