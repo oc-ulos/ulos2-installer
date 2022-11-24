@@ -90,7 +90,7 @@ while true do
   print("Please select a storage device:")
 
   for i=1, #filesystems do
-    printf("%02d. %s\n", i, filesystems[i])
+    printf("%2d. %s\n", i, filesystems[i])
   end
 
   local num = tonumber(promptText("Select one", nil, false, function(x)
@@ -191,7 +191,7 @@ print("\nNow you need to set up a user account.")
 do
   local name = promptText("Enter a name for the new account", nil, false,
     function(n)
-      return n:match("[a-z_][a-z0-9_%-]*%$?") and #n <= 32
+      return n:match("^[a-z_][a-z0-9_%-]*%$?$") and #n <= 32
     end)
 
   -- TODO: figure out why `os.execute("useradd ...") wasn't working here
