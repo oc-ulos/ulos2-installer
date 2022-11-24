@@ -106,8 +106,8 @@ while true do
   end
 end
 
-local ok1, err1 = stat.mkdir("/install", 0x1FF)
-if not ok1 and err1 ~= errno.EEXIST then
+local ok1, _, err1 = stat.mkdir("/install", 0x1FF)
+if (not ok1) and err1 ~= errno.EEXIST then
   fail("could not create /install: %s", errno.errno(err1))
 end
 
@@ -226,4 +226,7 @@ if not oku then
 end
 
 print("The system should now be set up and functional.")
-print("Remove the installation media and reboot.")
+print("Remove the installation media and reboot.\n")
+
+print("Or, press ENTER to quit the installer.")
+io.read()
