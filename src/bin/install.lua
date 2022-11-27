@@ -116,11 +116,30 @@ if not ok2 then
   fail("could not mount filesystem to /install: %s", errno.errno(err2))
 end
 
-if not os.execute("rm -rf /install/*") then
-  fail("failed clearing filesystem")
+do
+  local isInstallDevice
+
+  local h, e = io.open("/proc/mounts", "r")
+  if not h then
+    return fail("failed opening /proc/mounts: %s", e)
+  end
+
+  for line in h:lines() do
+    if line:match((fs:gsub("%-", "%%-"))) then
+      isInstallDevice = true
+      break
+    end
+  end
+  h:close()
+
+  if not isInstallDevice then
+    if not os.execute("rm -rf /install/*") then
+      fail("failed clearing filesystem")
+    end
+  end
 end
 
-local packages = { "cldr", "cynosure2", "liblua", "coreutils",
+local packages = { "cynosure2", "liblua", "coreutils",
   "reknit", "upt", "vbls" }
 
 local install = require("upt.tools.install")
@@ -219,6 +238,13 @@ if not okc2 then
   fail("exit chroot failed: %s", errno.errno(errc2))
 end
 
+print("Installing CLDR 2...")
+
+local okcl, errcl = upti_r("cldr", "/install", 0)
+if not okcl then
+  fail("installing package cldr failed: %s", errcl)
+end
+
 print("Unmounting install filesystem")
 local oku, erru = sys.unmount("/install")
 if not oku then
@@ -229,4 +255,4 @@ print("The system should now be set up and functional.")
 print("Remove the installation media and reboot.\n")
 
 print("Or, press ENTER to quit the installer.")
-io.read()
+do local _ = io.read() end
