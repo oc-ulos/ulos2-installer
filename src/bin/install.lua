@@ -139,7 +139,7 @@ do
   end
 end
 
-local packages = { "cynosure2", "liblua", "coreutils",
+local packages = { "cldr", "cynosure2", "liblua", "coreutils",
   "reknit", "upt", "vbls" }
 
 local install = require("upt.tools.install")
@@ -158,14 +158,14 @@ if not okl and errl then
 end
 
 for i=1, #packages do
-  local ok, err = upti_r(packages[i], "/install", 0)
+  local ok, err = upti_r(packages[i], "/install", 3)
   if not ok then
     fail("installing package %s failed: %s", packages[i], err)
   end
 end
 
 print("Installing ULOS-specific config files...")
-local ok, err = upti_l("/etc/upt/cache/ulos2-config.mtar", "/install", 0)
+local ok, err = upti_l("/etc/upt/cache/ulos2-config.mtar", "/install", 3)
 if not ok then
   fail("installing package ulos2-config failed: %s", err)
 end
@@ -236,13 +236,6 @@ end
 local okc2, errc2 = sys.chroot("/")
 if not okc2 then
   fail("exit chroot failed: %s", errno.errno(errc2))
-end
-
-print("Installing CLDR 2...")
-
-local okcl, errcl = upti_r("cldr", "/install", 0)
-if not okcl then
-  fail("installing package cldr failed: %s", errcl)
 end
 
 print("Unmounting install filesystem")
