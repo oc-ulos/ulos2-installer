@@ -178,64 +178,67 @@ local pwd = require("posix.pwd")
 local grp = require("posix.grp")
 local unistd = require("posix.unistd")
 
-local okc, errc = sys.chroot("/install")
-if not okc then
-  fail("chroot to /install failed: %s", errno.errno(errc))
-end
-
-local function changePassword(name, prompt)
-  local password
-
-  while true do
-    password = promptText(prompt, nil, false, nil, true)
-    if promptText("Confirm the password",nil,false,nil,true) == password then
-      break
-    else
-      print("Passwords do not match")
-    end
+local function inChroot()
+  local okc, errc = sys.chroot("/install")
+  if not okc then
+    fail("chroot to /install failed: %s", errno.errno(errc))
   end
 
-  local ent = pwd.getpwnam(name)
-  ent.pw_passwd = unistd.crypt(password)
+  local function changePassword(name, prompt)
+    local password
 
-  pwd.update_passwd(ent)
+    while true do
+      password = promptText(prompt, nil, false, nil, true)
+      if promptText("Confirm the password",nil,false,nil,true) == password then
+        break
+      else
+        print("Passwords do not match")
+      end
+    end
+
+    local ent = pwd.getpwnam(name)
+    ent.pw_passwd = unistd.crypt(password)
+
+    pwd.update_passwd(ent)
+  end
+
+  print("First, choose a new root password.")
+
+  changePassword("root", "Enter a new root password")
+
+  print("\nNow you need to set up a user account.")
+
+  do
+    local name = promptText("Enter a name for the new account", nil, false,
+      function(n)
+        return n:match("^[a-z_][a-z0-9_%-]*%$?$") and #n <= 32
+      end)
+
+    -- TODO: figure out why `os.execute("useradd ...") wasn't working here
+    pwd.update_passwd {
+      pw_name = name,
+      pw_passwd = "",
+      pw_uid = 1,
+      pw_gid = 1,
+      pw_gecos = "",
+      pw_dir = "/home/"..name,
+      pw_shell = "/bin/sh.lua"
+    }
+
+    grp.update_group {
+      gr_name = name,
+      gr_gid = 1,
+      gr_mem = {name}
+    }
+
+    changePassword(name, "Enter a password for the new account")
+  end
 end
 
-print("First, choose a new root password.")
-
-changePassword("root", "Enter a new root password")
-
-print("\nNow you need to set up a user account.")
-
-do
-  local name = promptText("Enter a name for the new account", nil, false,
-    function(n)
-      return n:match("^[a-z_][a-z0-9_%-]*%$?$") and #n <= 32
-    end)
-
-  -- TODO: figure out why `os.execute("useradd ...") wasn't working here
-  pwd.update_passwd {
-    pw_name = name,
-    pw_passwd = "",
-    pw_uid = 1,
-    pw_gid = 1,
-    pw_gecos = "",
-    pw_dir = "/home/"..name,
-    pw_shell = "/bin/sh.lua"
-  }
-
-  grp.update_group {
-    gr_name = name,
-    gr_gid = 1,
-    gr_mem = {name}
-  }
-
-  changePassword(name, "Enter a password for the new account")
-end
-
-local okc2, errc2 = sys.chroot("/")
-if not okc2 then
-  fail("exit chroot failed: %s", errno.errno(errc2))
+local npid = sys.fork(inChroot)
+local reason, status = sys.wait(npid)
+if status ~= 0 then
+  print("warning: chroot process " .. reason .. " / " .. status)
 end
 
 print("Unmounting install filesystem")
