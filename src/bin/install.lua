@@ -74,11 +74,9 @@ else
   fail("no available internet connection")
 end
 
-local tmpAddress = component.invoke(component.list("computer")(), "tmpAddress")
 local filesystems = {}
 for address in component.list("filesystem") do
-  print(address, tmpAddress)
-  if address ~= tmpAddress and not component.invoke(address, "isReadOnly") then
+  if not component.invoke(address, "isReadOnly") then
     filesystems[#filesystems+1] = {type = "managed", address = address}
   end
 end
@@ -107,6 +105,8 @@ while true do
     return filesystems[tonumber(x) or 0]
   end))
 
+  if num == 0 then return end
+
   print("\n\27[97mAll data on the selected device will be erased.")
   print("\27[91mProceed with caution.\27[39m")
   if promptYN(string.format("Continue with %s?",
@@ -118,8 +118,8 @@ end
 
 if fs.type == "unmanaged" then
   print("Creating partitions...")
-  os.execute("mkpart -f -l ULOS2 -p 1:label=cldr2,flags=active,type=BOOTCODE,size=16:2:type=SIMPLEFS,label=ulos2root " .. fs.address)
-  os.execute("mkfs.sfs -eF -l ulos2root --i-know-what-im-doing "..fs.address.."2")
+  os.execute("mkpart -ef -l ULOS2 -p 1:label=cldr2,flags=active,type=BOOTCODE,size=16:2:type=SIMPLEFS,label=ulos2root " .. fs.address)
+  os.execute("mkfs.sfs -F -l ulos2root --i-know-what-im-doing "..fs.address.."2")
 end
 
 local ok1, _, err1 = stat.mkdir("/install", 0x1FF)
