@@ -38,12 +38,15 @@ print("Checking install requirements...")
 
 local function fail(...)
   io.stderr:write(string.format(...) .. "\n")
+  io.stderr:write("Press Enter to quit.\n")
+  io.read()
   os.exit(1)
 end
 
 local sys = require("syscalls")
 local stat = require("posix.sys.stat")
 local errno = require("posix.errno")
+local dirent = require("posix.dirent")
 local component = require("component")
 
 local function promptText(thing, default, canBeEmpty, verify, hide)
@@ -71,11 +74,16 @@ else
   fail("no available internet connection")
 end
 
-local tmpAddress = component.invoke(component.list("computer")(), "tmpAddress")
 local filesystems = {}
 for address in component.list("filesystem") do
-  if address ~= tmpAddress and not component.invoke(address, "isReadOnly") then
-    filesystems[#filesystems+1] = address
+  if not component.invoke(address, "isReadOnly") then
+    filesystems[#filesystems+1] = {type = "managed", address = address}
+  end
+end
+
+for dev in dirent.files("/dev") do
+  if dev:match("hd[a-z]$") then
+    filesystems[#filesystems+1] = {type = "unmanaged", address = "/dev/"..dev}
   end
 end
 
@@ -90,20 +98,28 @@ while true do
   print("Please select a storage device:")
 
   for i=1, #filesystems do
-    printf("%2d. %s\n", i, filesystems[i])
+    printf("%2d. %s\n", i, filesystems[i].address)
   end
 
   local num = tonumber(promptText("Select one", nil, false, function(x)
     return filesystems[tonumber(x) or 0]
   end))
 
+  if num == 0 then return end
+
   print("\n\27[97mAll data on the selected device will be erased.")
   print("\27[91mProceed with caution.\27[39m")
-  if promptYN(string.format("Continue with %s?", filesystems[num]:sub(1,8)),
-      true, false) then
+  if promptYN(string.format("Continue with %s?",
+      filesystems[num].address:sub(1,8)), true, false) then
     fs = filesystems[num]
     break
   end
+end
+
+if fs.type == "unmanaged" then
+  print("Creating partitions...")
+  os.execute("mkpart -ef -l ULOS2 -p 1:label=cldr2,flags=active,type=BOOTCODE,size=16:2:type=SIMPLEFS,label=ulos2root " .. fs.address)
+  os.execute("mkfs.sfs -F -l ulos2root --i-know-what-im-doing "..fs.address.."2")
 end
 
 local ok1, _, err1 = stat.mkdir("/install", 0x1FF)
@@ -111,12 +127,16 @@ if (not ok1) and err1 ~= errno.EEXIST then
   fail("could not create /install: %s", errno.errno(err1))
 end
 
-local ok2, err2 = sys.mount(fs, "/install")
+local ok2, err2 = sys.mount(
+  fs.address .. (fs.type=="unmanaged" and 2 or ""),
+  "/install")
 if not ok2 then
   fail("could not mount filesystem to /install: %s", errno.errno(err2))
 end
 
 do
+  -- avoid removing files on the installation medium, because we need
+  -- init.lua to stick around so the installer can finish.
   local isInstallDevice
 
   local h, e = io.open("/proc/mounts", "r")
@@ -125,7 +145,7 @@ do
   end
 
   for line in h:lines() do
-    if line:match((fs:gsub("%-", "%%-"))) then
+    if line:match((fs.address:gsub("%-", "%%-"))) then
       isInstallDevice = true
       break
     end
@@ -141,6 +161,8 @@ end
 
 local packages = { "cldr", "cynosure2", "liblua", "coreutils",
   "reknit", "upt", "vbls" }
+
+if fs.type == "unmanaged" then packages[#packages+1] = "prismbios" end
 
 local install = require("upt.tools.install")
 local upti_r = install.install_repo
@@ -168,6 +190,11 @@ print("Installing ULOS-specific config files...")
 local ok, err = upti_l("/etc/upt/cache/ulos2-config.mtar", "/install", 3)
 if not ok then
   fail("installing package ulos2-config failed: %s", err)
+end
+
+-- TODO: rework cldr so this is more fluid
+if fs.type == "unmanaged" then
+  os.execute("dd /install/init.lua " .. fs.address .. "1")
 end
 
 print("The base system is now installed.")
