@@ -274,6 +274,8 @@ if not oku then
   fail("unmount /install failed: %s", errno.errno(erru))
 end
 
+component.invoke((component.list("eeprom", true)()), "setData", "")
+
 print("The system should now be set up and functional.")
 print("Remove the installation media and reboot.\n")
 
