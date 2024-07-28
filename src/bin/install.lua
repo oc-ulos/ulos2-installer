@@ -118,7 +118,7 @@ end
 
 if fs.type == "unmanaged" then
   print("Creating partitions...")
-  os.execute("mkpart -ef -l ULOS2 -p 1:label=cldr2,flags=active,type=BOOTCODE,size=16:2:type=SIMPLEFS,label=ulos2root " .. fs.address)
+  os.execute("mkpart -f -l ULOS2 -p 1:label=cldr2,flags=active,type=BOOTCODE,size=16:2:type=SIMPLEFS,label=ulos2root " .. fs.address)
   os.execute("mkfs.sfs -F -l ulos2root --i-know-what-im-doing "..fs.address.."2")
 end
 
